@@ -12,12 +12,22 @@ from matplotlib import style
 style.use('ggplot')
 import sys
 
-# Importing the .csv file
-df = pd.read_csv("FutMiniIbov_5m_nov2018ToFeb2019Comma.csv", index_col='datetime')
-print(df)
-print(type(df.index))
-# sys.exit()
+# Source data
+filename = 'NEG_BMF_20190212/NEG_BMF_20190212.TXT'
 
+# Headers names for the dataframe
+dfheaders = ['data_sessao', 'simbolo_instrumento', 'nr_negocio', 'preco_negocio', 'qtde', 'hora', 'ind_anulacao',
+             'data_of_compra', 'seq_oferta_compra', 'genid_of_compra', 'cond_of_compra', 'data_of_venda',
+             'seq_of_venda', 'genid_if_venda', 'cond_of_venda', 'ind_direto', 'corretora_compra', 'corretora_venda']
+
+# Importing the .csv file
+df = pd.read_csv(filename, delimiter=';', skiprows=1, error_bad_lines=False, names=dfheaders)
+print(df.head().to_string())
+# Removes the last row of dataframe
+df.drop(df.tail(1).index,inplace=True)
+df['simbolo_instrumento'] = df['simbolo_instrumento'].str.strip()
+print(df.head().to_string())
+print(df['simbolo_instrumento'])
 
 
 # # Using QUANDL website to get the datasets with API
@@ -26,7 +36,7 @@ print(type(df.index))
 
 # Defining a start and end date from QUANDL dataset
 start_date = "12/03/2018"
-end_date = datetime.date.today()      # This function returns the today date
+end_date = datetime.date.today()  # This function returns the today date
 
 # # My dataset from ticker selected above
 # df = quandl.get(ticker, start_date=start_date, end_date=end_date)
@@ -43,9 +53,11 @@ df['pct_vol'] = (df['max'] - df['fec']) / df['fec'] * 100.0
 df['pct_change'] = (df['fec'] - df['abe']) / df['abe'] * 100.0
 
 # Creating three dataframes for the three classifiers to be used
-df_lin = df[['abe','max','min','fec','vwapd','mme9','mme34','mma200','hig10','low10','pct_change', 'pct_vol']]
-df_svr_lin = df[['abe','max','min','fec','vwapd','mme9','mme34','mma200','hig10','low10','pct_change', 'pct_vol']]
-df_svr_rbf = df[['abe','max','min','fec','vwapd','mme9','mme34','mma200','hig10','low10','pct_change', 'pct_vol']]
+df_lin = df[['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
+df_svr_lin = df[
+    ['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
+df_svr_rbf = df[
+    ['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
 
 # Defining the forecast column, in this case the Adjacent Closed Price
 forecast_col = 'fec'
@@ -59,7 +71,7 @@ df_svr_rbf.fillna(-99999, inplace=True)
 days_forecast = 1
 forecast_out = int(days_forecast)
 
-#Shifiting the new column "label" accordingly the days forecasted above
+# Shifiting the new column "label" accordingly the days forecasted above
 df_lin['label'] = df_lin[forecast_col].shift(-forecast_out)
 df_svr_lin['label'] = df_svr_lin[forecast_col].shift(-forecast_out)
 df_svr_rbf['label'] = df_svr_rbf[forecast_col].shift(-forecast_out)
@@ -128,7 +140,7 @@ df_svr_rbf['Forecast_svr_rbf'] = np.nan
 # Getting the business and holiday days
 bday_us = CustomBusinessDay(calendar=USFederalHolidayCalendar())
 
-#Last date on dataset in accordingly with forecasted days inserted
+# Last date on dataset in accordingly with forecasted days inserted
 last_date_lin = df_lin.iloc[-1].name
 last_date_svr_lin = df_svr_lin.iloc[-1].name
 last_date_svr_rbf = df_svr_rbf.iloc[-1].name
@@ -141,21 +153,21 @@ next_bday_svr_rbf = last_date_svr_rbf + "1"
 for i in forecast_predicted_svr_lin:
     next_date_svr_lin = next_bday_svr_lin
     next_bday_svr_lin += one_day
-    df_svr_lin.loc[next_date_svr_lin] = [np.nan for _ in range(len(df_svr_lin.columns)-1)] + [i]
+    df_svr_lin.loc[next_date_svr_lin] = [np.nan for _ in range(len(df_svr_lin.columns) - 1)] + [i]
 for i in forecast_predicted_svr_rbf:
     next_date_svr_rbf = next_bday_svr_rbf
     next_bday_svr_rbf += one_day
-    df_svr_rbf.loc[next_date_svr_rbf] = [np.nan for _ in range(len(df_svr_rbf.columns)-1)] + [i]
+    df_svr_rbf.loc[next_date_svr_rbf] = [np.nan for _ in range(len(df_svr_rbf.columns) - 1)] + [i]
 for i in forecast_predicted_lin:
     next_date_lin = next_bday_lin
     next_bday_lin += one_day
-    df_lin.loc[next_date_lin] = [np.nan for _ in range(len(df_lin.columns)-1)] + [i]
+    df_lin.loc[next_date_lin] = [np.nan for _ in range(len(df_lin.columns) - 1)] + [i]
 
 # Console log to accuracies
 print()
-print("Accuracy SVR lin: ", forecast_out, " Days ahead: ", (accuracy_svr_lin*100).round(2), "%")
-print("Accuracy SVR rbf: ", forecast_out, " Days ahead: ", (accuracy_svr_rbf*100).round(2), "%")
-print("Accuracy     Lin: ", forecast_out, " Days ahead: ", (accuracy_lin*100).round(2), "%")
+print("Accuracy SVR lin: ", forecast_out, " Days ahead: ", (accuracy_svr_lin * 100).round(2), "%")
+print("Accuracy SVR rbf: ", forecast_out, " Days ahead: ", (accuracy_svr_rbf * 100).round(2), "%")
+print("Accuracy     Lin: ", forecast_out, " Days ahead: ", (accuracy_lin * 100).round(2), "%")
 
 print(df_real['fec'])
 print(df_lin['Forecast_lin'])
@@ -173,7 +185,7 @@ plt.title(str(forecast_out) + " day(s) forecast\n")
 plt.suptitle("Accuracy Lin:     " + str((accuracy_lin * 100).round(2)) + "%\n" +
              "Accuracy SVR Lin: " + str((accuracy_svr_lin * 100).round(2)) + "%\n" +
              "Accuracy SVR Rbf: " + str((accuracy_svr_rbf * 100).round(2)) + "%\n\n"
-            )
+             )
 plt.xlabel('\nDate and Time')
 plt.ylabel('Price in U$')
 plt.show()
