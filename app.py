@@ -13,21 +13,22 @@ style.use('ggplot')
 import sys
 
 # Source data
-filename = 'NEG_BMF_20190212/NEG_BMF_20190212.TXT'
+filename = 'novo_datasource_teste.csv'
 
-# Headers names for the dataframe
-dfheaders = ['data_sessao', 'simbolo_instrumento', 'nr_negocio', 'preco_negocio', 'qtde', 'hora', 'ind_anulacao',
-             'data_of_compra', 'seq_oferta_compra', 'genid_of_compra', 'cond_of_compra', 'data_of_venda',
-             'seq_of_venda', 'genid_if_venda', 'cond_of_venda', 'ind_direto', 'corretora_compra', 'corretora_venda']
+# # Headers names for the dataframe
+# dfheaders = ['data_sessao', 'simbolo_instrumento', 'nr_negocio', 'preco_negocio', 'qtde', 'hora', 'ind_anulacao',
+#              'data_of_compra', 'seq_oferta_compra', 'genid_of_compra', 'cond_of_compra', 'data_of_venda',
+#              'seq_of_venda', 'genid_if_venda', 'cond_of_venda', 'ind_direto', 'corretora_compra', 'corretora_venda']
 
 # Importing the .csv file
-df = pd.read_csv(filename, delimiter=';', skiprows=1, error_bad_lines=False, names=dfheaders)
+df = pd.read_csv(filename, delimiter=',')
 print(df.head().to_string())
-# Removes the last row of dataframe
-df.drop(df.tail(1).index,inplace=True)
-df['simbolo_instrumento'] = df['simbolo_instrumento'].str.strip()
-print(df.head().to_string())
-print(df['simbolo_instrumento'])
+
+# # Removes the last row of dataframe
+# df.drop(df.tail(1).index,inplace=True)
+# df['simbolo_instrumento'] = df['simbolo_instrumento'].str.strip()
+# print(df.head().to_string())
+# print(df['simbolo_instrumento'])
 
 
 # # Using QUANDL website to get the datasets with API
@@ -35,7 +36,7 @@ print(df['simbolo_instrumento'])
 # ticker = "WIKI/GOOGL"
 
 # Defining a start and end date from QUANDL dataset
-start_date = "12/03/2018"
+start_date = "2018-10-15 9:00"
 end_date = datetime.date.today()  # This function returns the today date
 
 # # My dataset from ticker selected above
@@ -45,22 +46,26 @@ end_date = datetime.date.today()  # This function returns the today date
 # df = df[['Adj. Open','Adj. High','Adj. Low','Adj. Close','Adj. Volume']]
 
 # dataframe original with all prices and dates
-df_real = df[['fec']]
+df_real = df[['Fechamento']]
 
 # Creating two features to add to our dataframe
 # Percentage volatility of the prices and percentage change of the prices
-df['pct_vol'] = (df['max'] - df['fec']) / df['fec'] * 100.0
-df['pct_change'] = (df['fec'] - df['abe']) / df['abe'] * 100.0
+df['pct_vol'] = (df['Maxima'] - df['Fechamento']) / df['Fechamento'] * 100.0
+df['pct_change'] = (df['Fechamento'] - df['Abertura']) / df['Abertura'] * 100.0
 
 # Creating three dataframes for the three classifiers to be used
-df_lin = df[['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
-df_svr_lin = df[
-    ['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
-df_svr_rbf = df[
-    ['abe', 'max', 'min', 'fec', 'vwapd', 'mme9', 'mme34', 'mma200', 'hig10', 'low10', 'pct_change', 'pct_vol']]
+df_lin = df[['Abertura', 'Maxima','Minima','Fechamento','VWAPD','MediaMovelE9','MediaMovelA200','PriorCote',
+             'MediaMovelA42','Lowest20','BBAUp20','BBDown20','Highest20','QAAD','IFR4','VolumeFinanceiro',
+             'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+df_svr_lin = df[['Abertura', 'Maxima','Minima','Fechamento','VWAPD','MediaMovelE9','MediaMovelA200','PriorCote',
+             'MediaMovelA42','Lowest20','BBAUp20','BBDown20','Highest20','QAAD','IFR4','VolumeFinanceiro',
+             'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+df_svr_rbf = df[['Abertura', 'Maxima','Minima','Fechamento','VWAPD','MediaMovelE9','MediaMovelA200','PriorCote',
+             'MediaMovelA42','Lowest20','BBAUp20','BBDown20','Highest20','QAAD','IFR4','VolumeFinanceiro',
+             'MediaMovelVolA20', 'pct_change', 'pct_vol']]
 
 # Defining the forecast column, in this case the Adjacent Closed Price
-forecast_col = 'fec'
+forecast_col = 'Fechamento'
 
 # Filling any blank field with NA
 df_lin.fillna(-99999, inplace=True)
@@ -68,7 +73,7 @@ df_svr_lin.fillna(-99999, inplace=True)
 df_svr_rbf.fillna(-99999, inplace=True)
 
 # Define the days that you want to forecast (business days and holidays)
-days_forecast = 1
+days_forecast = 30
 forecast_out = int(days_forecast)
 
 # Shifiting the new column "label" accordingly the days forecasted above
@@ -137,31 +142,31 @@ df_lin['Forecast_lin'] = np.nan
 df_svr_lin['Forecast_svr_lin'] = np.nan
 df_svr_rbf['Forecast_svr_rbf'] = np.nan
 
-# Getting the business and holiday days
-bday_us = CustomBusinessDay(calendar=USFederalHolidayCalendar())
-
-# Last date on dataset in accordingly with forecasted days inserted
-last_date_lin = df_lin.iloc[-1].name
-last_date_svr_lin = df_svr_lin.iloc[-1].name
-last_date_svr_rbf = df_svr_rbf.iloc[-1].name
-one_day = "1"
-next_bday_lin = last_date_lin + '1'
-next_bday_svr_lin = last_date_svr_lin + "1"
-next_bday_svr_rbf = last_date_svr_rbf + "1"
+# # Getting the business and holiday days
+# bday_us = CustomBusinessDay(calendar=USFederalHolidayCalendar())
+#
+# # Last date on dataset in accordingly with forecasted days inserted
+# last_date_lin = df_lin.iloc[-1].name
+# last_date_svr_lin = df_svr_lin.iloc[-1].name
+# last_date_svr_rbf = df_svr_rbf.iloc[-1].name
+# one_day = "1"
+# next_bday_lin = last_date_lin + '1'
+# next_bday_svr_lin = last_date_svr_lin + "1"
+# next_bday_svr_rbf = last_date_svr_rbf + "1"
 
 # Looping to adding every predicted price in the right date
 for i in forecast_predicted_svr_lin:
-    next_date_svr_lin = next_bday_svr_lin
-    next_bday_svr_lin += one_day
-    df_svr_lin.loc[next_date_svr_lin] = [np.nan for _ in range(len(df_svr_lin.columns) - 1)] + [i]
+    # next_date_svr_lin = next_bday_svr_lin
+    # next_bday_svr_lin += one_day
+    df_svr_lin.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_svr_lin.columns) - 1)] + [i]
 for i in forecast_predicted_svr_rbf:
-    next_date_svr_rbf = next_bday_svr_rbf
-    next_bday_svr_rbf += one_day
-    df_svr_rbf.loc[next_date_svr_rbf] = [np.nan for _ in range(len(df_svr_rbf.columns) - 1)] + [i]
+    # next_date_svr_rbf = next_bday_svr_rbf
+    # next_bday_svr_rbf += one_day
+    df_svr_rbf.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_svr_rbf.columns) - 1)] + [i]
 for i in forecast_predicted_lin:
-    next_date_lin = next_bday_lin
-    next_bday_lin += one_day
-    df_lin.loc[next_date_lin] = [np.nan for _ in range(len(df_lin.columns) - 1)] + [i]
+    # next_date_lin = next_bday_lin
+    # next_bday_lin += one_day
+    df_lin.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_lin.columns) - 1)] + [i]
 
 # Console log to accuracies
 print()
@@ -169,13 +174,13 @@ print("Accuracy SVR lin: ", forecast_out, " Days ahead: ", (accuracy_svr_lin * 1
 print("Accuracy SVR rbf: ", forecast_out, " Days ahead: ", (accuracy_svr_rbf * 100).round(2), "%")
 print("Accuracy     Lin: ", forecast_out, " Days ahead: ", (accuracy_lin * 100).round(2), "%")
 
-print(df_real['fec'])
+print(df_real['Fechamento'])
 print(df_lin['Forecast_lin'])
 print(df_svr_lin['Forecast_svr_lin'])
 print(df_svr_rbf['Forecast_svr_rbf'])
 
 # Ploting the data to compare the predicted with the real data
-df_real['fec'].plot(color="green", linewidth=3)
+df_real['Fechamento'].plot(color="green", linewidth=3)
 df_lin['Forecast_lin'].plot(color="red")
 df_svr_lin['Forecast_svr_lin'].plot(color="blue")
 df_svr_rbf['Forecast_svr_rbf'].plot(color="orange")
