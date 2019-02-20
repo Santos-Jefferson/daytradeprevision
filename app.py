@@ -1,5 +1,6 @@
 import quandl, math, datetime
 import pandas as pd
+import datetime as dt
 from pandas.tseries.offsets import BDay, CustomBusinessDay
 from pandas.tseries.holiday import USFederalHolidayCalendar
 import numpy as np
@@ -22,7 +23,15 @@ filename = 'novo_datasource_teste.csv'
 
 # Importing the .csv file
 df = pd.read_csv(filename, delimiter=',')
+df = df.replace(0, np.nan)
+df = df.dropna()
+df['Data'] = pd.to_datetime(df['Data'])
+df = df.sort_values(by=['Data'])
+
+print(df.dtypes)
 print(df.head().to_string())
+print(df.tail().to_string())
+
 
 # # Removes the last row of dataframe
 # df.drop(df.tail(1).index,inplace=True)
@@ -36,8 +45,9 @@ print(df.head().to_string())
 # ticker = "WIKI/GOOGL"
 
 # Defining a start and end date from QUANDL dataset
-start_date = "2018-10-15 9:00"
-end_date = datetime.date.today()  # This function returns the today date
+min_date_datasource = df['Data'].min()
+max_date_datasource = df['Data'].max()
+today_datetime = dt.datetime.now()
 
 # # My dataset from ticker selected above
 # df = quandl.get(ticker, start_date=start_date, end_date=end_date)
@@ -47,6 +57,9 @@ end_date = datetime.date.today()  # This function returns the today date
 
 # dataframe original with all prices and dates
 df_real = df[['Fechamento']]
+
+# print(df_real)
+
 
 # Creating two features to add to our dataframe
 # Percentage volatility of the prices and percentage change of the prices
@@ -64,40 +77,59 @@ df_svr_rbf = df[['Abertura', 'Maxima','Minima','Fechamento','VWAPD','MediaMovelE
              'MediaMovelA42','Lowest20','BBAUp20','BBDown20','Highest20','QAAD','IFR4','VolumeFinanceiro',
              'MediaMovelVolA20', 'pct_change', 'pct_vol']]
 
+# print(df_lin['pct_change'])
+# print(df_lin['pct_vol'])
+
+
 # Defining the forecast column, in this case the Adjacent Closed Price
 forecast_col = 'Fechamento'
 
-# Filling any blank field with NA
-df_lin.fillna(-99999, inplace=True)
-df_svr_lin.fillna(-99999, inplace=True)
-df_svr_rbf.fillna(-99999, inplace=True)
+# # Filling any blank field with NA
+# df_lin = pd.fillna(0, inplace=True)
+# df_svr_lin = df_svr_lin.fillna(df_svr_lin.mean(), inplace=True)
+# df_svr_rbf = df_svr_rbf.fillna(df_svr_rbf.mean(), inplace=True)
 
-# Define the days that you want to forecast (business days and holidays)
-days_forecast = 30
-forecast_out = int(days_forecast)
+print(df_lin.head(100))
 
+# # Define the periods of 15 minutes to forecast (36 is equal 1 day)
+periods_forecast = 36
+forecast_out = int(periods_forecast)
+#
 # Shifiting the new column "label" accordingly the days forecasted above
 df_lin['label'] = df_lin[forecast_col].shift(-forecast_out)
 df_svr_lin['label'] = df_svr_lin[forecast_col].shift(-forecast_out)
 df_svr_rbf['label'] = df_svr_rbf[forecast_col].shift(-forecast_out)
+
+print(df_lin.to_string())
+
 
 # Creating the X dataset without the label
 X_lin = np.array(df_lin.drop(['label'], 1))
 X_svr_lin = np.array(df_svr_lin.drop(['label'], 1))
 X_svr_rbf = np.array(df_svr_rbf.drop(['label'], 1))
 
+print(X_lin)
+
+# sys.exit()
+
 # Scaling the data
 X_lin = preprocessing.scale(X_lin)
 X_svr_lin = preprocessing.scale(X_svr_lin)
 X_svr_rbf = preprocessing.scale(X_svr_rbf)
+print(X_lin.__str__())
+
 X_lin = X_lin[:-forecast_out:]
 X_svr_lin = X_svr_lin[:-forecast_out:]
 X_svr_rbf = X_svr_rbf[:-forecast_out:]
+print(X_lin.__str__())
 
 # Creating the X to put the predicted data
 X_lately_lin = X_lin[-forecast_out:]
 X_lately_svr_lin = X_svr_lin[-forecast_out:]
 X_lately_svr_rbf = X_svr_rbf[-forecast_out:]
+print(X_lately_lin.__str__())
+# sys.exit()
+
 
 # Preparing the data to drop NAs
 df_lin.dropna(inplace=True)
@@ -137,6 +169,9 @@ forecast_predicted_svr_lin = clf_svr_lin.predict(X_lately_svr_lin)
 forecast_predicted_svr_rbf = clf_svr_rbf.predict(X_lately_svr_rbf)
 forecast_predicted_lin = clf_lin.predict(X_lately_lin)
 
+print(forecast_predicted_lin)
+# sys.exit()
+
 # Creating the column with nan
 df_lin['Forecast_lin'] = np.nan
 df_svr_lin['Forecast_svr_lin'] = np.nan
@@ -158,21 +193,21 @@ df_svr_rbf['Forecast_svr_rbf'] = np.nan
 for i in forecast_predicted_svr_lin:
     # next_date_svr_lin = next_bday_svr_lin
     # next_bday_svr_lin += one_day
-    df_svr_lin.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_svr_lin.columns) - 1)] + [i]
+    df_svr_lin.loc[i] = [np.nan for _ in range(len(df_svr_lin.columns) - 1)] + [i]
 for i in forecast_predicted_svr_rbf:
     # next_date_svr_rbf = next_bday_svr_rbf
     # next_bday_svr_rbf += one_day
-    df_svr_rbf.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_svr_rbf.columns) - 1)] + [i]
+    df_svr_rbf.loc[i] = [np.nan for _ in range(len(df_svr_rbf.columns) - 1)] + [i]
 for i in forecast_predicted_lin:
     # next_date_lin = next_bday_lin
     # next_bday_lin += one_day
-    df_lin.loc[df_lin.iloc[-1].name] = [np.nan for _ in range(len(df_lin.columns) - 1)] + [i]
+    df_lin.loc[i] = [np.nan for _ in range(len(df_lin.columns) - 1)] + [i]
 
 # Console log to accuracies
 print()
-print("Accuracy SVR lin: ", forecast_out, " Days ahead: ", (accuracy_svr_lin * 100).round(2), "%")
-print("Accuracy SVR rbf: ", forecast_out, " Days ahead: ", (accuracy_svr_rbf * 100).round(2), "%")
-print("Accuracy     Lin: ", forecast_out, " Days ahead: ", (accuracy_lin * 100).round(2), "%")
+print("Accuracy SVR lin: ", forecast_out, " Periods ahead: ", (accuracy_svr_lin * 100).round(2), "%")
+print("Accuracy SVR rbf: ", forecast_out, " Periods ahead: ", (accuracy_svr_rbf * 100).round(2), "%")
+print("Accuracy     Lin: ", forecast_out, " Periods ahead: ", (accuracy_lin * 100).round(2), "%")
 
 print(df_real['Fechamento'])
 print(df_lin['Forecast_lin'])
@@ -186,7 +221,7 @@ df_svr_lin['Forecast_svr_lin'].plot(color="blue")
 df_svr_rbf['Forecast_svr_rbf'].plot(color="orange")
 # plt.xlim(xmin=datetime.date(2017, 1, 1), xmax=datetime.date.today())
 plt.legend(loc=4)
-plt.title(str(forecast_out) + " day(s) forecast\n")
+plt.title(str(forecast_out) + " Periods(s) forecast\n")
 plt.suptitle("Accuracy Lin:     " + str((accuracy_lin * 100).round(2)) + "%\n" +
              "Accuracy SVR Lin: " + str((accuracy_svr_lin * 100).round(2)) + "%\n" +
              "Accuracy SVR Rbf: " + str((accuracy_svr_rbf * 100).round(2)) + "%\n\n"
