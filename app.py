@@ -10,16 +10,23 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from matplotlib import style
-
 style.use('ggplot')
 import sys
 
+# CONSTANTS
+PERIODS = 36
+CROSS_TEST = 0.2
+
+
 # Source data
-filename = 'novo_datasource_teste.csv'
+# filename = 'novo_datasource_teste.csv'
+filename = 'indfut_15min.txt'
 
 # Importing and normalizing the .CSV file
-df = pd.read_csv(filename, delimiter=',', index_col=0)
-df.index = pd.to_datetime(df.index)
+df = pd.read_csv(filename, delimiter='\t', parse_dates=True, dayfirst=True, decimal=',', index_col=0,
+                 usecols=['Data','Abertura','Máxima','Fechamento','VWAP D','Pivot']
+                 )
+# df.index = pd.to_datetime(df.index)
 df = df.sort_index()
 df = df.replace(0, np.nan)  # Replacing '0 values' to Numpy nan
 df = df.dropna()  # Dropping nan rows from the dataframe
@@ -43,28 +50,32 @@ df_preco_fech_real = df[['Fechamento']]  # Two brackets create pd Dataframe, one
 
 # Creating two features to add to our dataframe
 # Percentage volatility of the prices and percentage change of the prices
-df['pct_vol'] = (df['Maxima'] - df['Fechamento']) / df['Fechamento'] * 100.0
+df['pct_vol'] = (df['Máxima'] - df['Fechamento']) / df['Fechamento'] * 100.0
 df['pct_change'] = (df['Fechamento'] - df['Abertura']) / df['Abertura'] * 100.0
 
 # Creating three dataframes for the three classifiers to be used
-df_lin = df[
-    ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
-     'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
-     'MediaMovelVolA20', 'pct_change', 'pct_vol']]
-df_svr_lin = df[
-    ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
-     'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
-     'MediaMovelVolA20', 'pct_change', 'pct_vol']]
-df_svr_rbf = df[
-    ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
-     'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
-     'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+# df_lin = df[
+#     ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
+#      'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
+#      'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+# df_svr_lin = df[
+#     ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
+#      'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
+#      'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+# df_svr_rbf = df[
+#     ['Abertura', 'Maxima', 'Minima', 'Fechamento', 'VWAPD', 'MediaMovelE9', 'MediaMovelA200', 'PriorCote',
+#      'MediaMovelA42', 'Lowest20', 'BBAUp20', 'BBDown20', 'Highest20', 'QAAD', 'IFR4', 'VolumeFinanceiro',
+#      'MediaMovelVolA20', 'pct_change', 'pct_vol']]
+
+df_lin = df.copy()
+df_svr_lin = df.copy()
+df_svr_rbf = df.copy()
 
 # Defining the forecast column, in this case the Adjacent Closed Price
 forecast_col = 'Fechamento'
 
 # # Define the periods of 15 minutes to forecast (36 is equal 1 day)
-periods_forecast = 36
+periods_forecast = PERIODS
 forecast_out = int(periods_forecast)
 #
 # Shifiting the new column "label" accordingly the days forecasted above
@@ -128,14 +139,14 @@ y_svr_rbf = np.array(df_svr_rbf['label'])
 print(X_lin)
 print(y_lin)
 
-X_lin_train, X_lin_test, y_lin_train, y_lin_test = train_test_split(X_lin, y_lin, test_size=0.3)
-X_svr_lin_train, X_svr_lin_test, y_svr_lin_train, y_svr_lin_test = train_test_split(X_svr_lin, y_svr_lin, test_size=0.3)
-X_svr_rbf_train, X_svr_rbf_test, y_svr_rbf_train, y_svr_rbf_test = train_test_split(X_svr_rbf, y_svr_rbf, test_size=0.3)
+X_lin_train, X_lin_test, y_lin_train, y_lin_test = train_test_split(X_lin, y_lin, test_size=CROSS_TEST)
+X_svr_lin_train, X_svr_lin_test, y_svr_lin_train, y_svr_lin_test = train_test_split(X_svr_lin, y_svr_lin, test_size=CROSS_TEST)
+X_svr_rbf_train, X_svr_rbf_test, y_svr_rbf_train, y_svr_rbf_test = train_test_split(X_svr_rbf, y_svr_rbf, test_size=CROSS_TEST)
 
 # The classifiers
 clf_lin = LinearRegression()
 clf_svr_lin = svm.SVR(kernel='linear', C=1e3, verbose=False)
-clf_svr_rbf = svm.SVR(kernel='rbf', C=1e3, gamma=0.9, verbose=False)
+clf_svr_rbf = svm.SVR(kernel='rbf', C=1e3, gamma=0.00015, verbose=False)
 
 # Fitting the training data
 clf_lin.fit(X_lin_train, y_lin_train)
